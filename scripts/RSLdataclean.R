@@ -156,8 +156,33 @@ chl_a_samples_messy_raw %>%
 #   1 CHL0154           ST095        1994-09-14                1                  NA
 # 2 CHL0163           ST069        1998-05-25                1                  NA
 
+#Fix issues with absorbance_663nm and sample_volume_filtered_ml variables
+chl_a_samples_clean <- chl_a_samples_messy_raw %>%
+  mutate(
+    altered = coalesce( #identify which rows were altered =TRUE
+      (row_number() == 154 & str_detect(absorbance_663nm, ",")) |
+      (row_number() == 163 & str_detect(sample_volume_filtered_ml,
+                                        regex(",|mL", ignore_case = TRUE))),
+      FALSE
+    ), 
 
-
+    absorbance_663nm = if_else(
+      row_number() == 154, #specifically selects one problem
+      str_replace(absorbance_663nm, ",", "."), #replaces comma with period
+      absorbance_663nm
+    ),
+    
+    sample_volume_filtered_ml = if_else(
+      row_number() == 163, #specifically selects one problem
+      sample_volume_filtered_ml %>%
+        str_remove_all(",") %>% #change 1,000 to 1000
+        str_remove_all(regex("mL", ignore_case=TRUE)) %>% #removes unnecessary unit label
+        str_trim(), #gets rid of any white space created by deletion
+      sample_volume_filtered_ml
+    ),
+    
+    across(c(absorbance_663nm, sample_volume_filtered_ml), as.numeric) #changes class from character to numeric
+  )
 
 
 #Create empty log to document cleaning changes
@@ -182,6 +207,11 @@ cleaning_log <- tibble::tribble(
   "Waterbody capitalization issues",
   "WB075",
   "replaced all stringr to affect quinn lake string",
+  "Documented decision",
+  
+  "Changed comma to period, removed comma and removed unit label",
+  "CHL0154; CHL0163",
+  "Fixed values, changed class to numeric, identified in altered column",
   "Documented decision"
 ) |>
   mutate(log_id = row_number()) |>
