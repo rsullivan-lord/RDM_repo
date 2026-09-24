@@ -24,8 +24,7 @@ here("data", "chl-a-samples-messy.csv")
 here("data", "stations-messy.csv")
 here("data", "waterbodies-messy.csv")
 
-#Read in the raw data
-#Chlorophyll A samples raw
+#Read in raw chlorophyll A data
 chl_a_samples_messy_raw <- readr::read_csv(
   here::here(
     "data",
@@ -33,7 +32,8 @@ chl_a_samples_messy_raw <- readr::read_csv(
     "chl-a-samples-messy.csv"
   )
 )
-#Stations raw
+
+#Read in Stations raw
 stations_messy_raw <- readr::read_csv(
   here::here(
     "data",
@@ -41,7 +41,8 @@ stations_messy_raw <- readr::read_csv(
     "stations-messy.csv"
   )
 )
-#Waterbodies raw
+
+#Read in Waterbodies raw
 waterbodies_messy_raw <- readr::read_csv(
   here::here(
     "data",
@@ -50,12 +51,40 @@ waterbodies_messy_raw <- readr::read_csv(
   )
 )
 
-#Data exploration Waterbodies messy
+#Data exploration waterbodies-messy.csv
 dim(waterbodies_messy_raw) #[1] 87 rows (observations) 2 columns (variables)
 head(waterbodies_messy_raw, 5)
 summary(waterbodies_messy_raw)
 skimr::skim(waterbodies_messy_raw)
-glimpse(waterbodies_messy_raw)
+
+#── Data Summary ────────────────────────
+# Values               
+# Name                       waterbodies_messy_raw
+# Number of rows             87                   
+# Number of columns          2                    
+# _______________________                         
+# Column type frequency:                          
+#   character                2                    
+# ________________________                        
+# Group variables            None                 
+# 
+# ── Variable type: character ─────────────────────────────────────────────────────────────
+# skim_variable  n_missing complete_rate min max empty n_unique whitespace
+# 1 waterbody_code         0             1   5   5     0       87          0
+# 2 waterbody_name         0             1   4  23     0       87          0
+# glimpse(waterbodies_messy_raw)
+
+#Capitalize all waterbody names and create new clean dataframe with column indicating what was alteration
+waterbodies_clean <- waterbodies_messy_raw %>%
+  mutate(
+    waterbody_name_clean = str_replace_all(waterbody_name, "quinn lake", "Quinn Lake"),
+    name_fixed = waterbody_name !=waterbody_name_clean,
+    altered = name_fixed
+    ) %>%
+  select(-name_fixed, -waterbody_name)
+
+#Save cleaned waterbodies csv file
+write_csv(waterbodies_clean, "data/processed/waterbodies_clean.csv")
 
 #Data exploration Stations messy
 dim(stations_messy_raw) #[1] 97 rows (observations) 6 columns (variables)
@@ -110,6 +139,27 @@ summary(chl_a_samples_messy_raw)
 skimr::skim(chl_a_samples_messy_raw)
 glimpse(chl_a_samples_messy_raw)
 
+#Fix variable classes for sample_volume_filtered_ml and absorbance_663nm from character to numeric
+chl_a_samples_clean <- chl_a_samples_messy_raw %>%
+  mutate(
+    across(c(sample_volume_filtered_ml, absorbance_663nm), as.numeric)
+  )
+#returns error so identify values that are causing problem
+chl_a_samples_messy_raw %>%
+  filter(
+    (!is.na(sample_volume_filtered_ml) & is.na(suppressWarnings(as.numeric(sample_volume_filtered_ml)))) |
+      (!is.na(absorbance_663nm) & is.na(suppressWarnings(as.numeric(absorbance_663nm))))
+  )
+## A tibble: 2 × 15
+# chl_a_sample_code station_code date       sample_replicate subsample_replicate
+# <chr>             <chr>        <chr>                 <dbl>               <dbl>
+#   1 CHL0154           ST095        1994-09-14                1                  NA
+# 2 CHL0163           ST069        1998-05-25                1                  NA
+
+
+
+
+
 #Create empty log to document cleaning changes
 #Each row documents a cleaning decision, assumption, or unresolved issue
 cleaning_log <- tibble::tibble(
@@ -124,10 +174,15 @@ cleaning_log <- tibble::tibble(
 cleaning_log <- tibble::tribble(
   ~issue_or_decision, ~affected_records, ~action_taken, ~status,
   
-  "Swapped coordinate values and missing sign",
+  "Swapped station coordinate values and missing sign",
   "ST005; ST052",
   "Fixed values, created new columns, created altered column indicating change",
   "Documented decision",
+  
+  "Waterbody capitalization issues",
+  "WB075",
+  "replaced all stringr to affect quinn lake string",
+  "Documented decision"
 ) |>
   mutate(log_id = row_number()) |>
   select(log_id, everything())

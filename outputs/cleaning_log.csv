@@ -1,2 +1,3 @@
 log_id,issue_or_decision,affected_records,action_taken,status
-1,Swapped coordinate values and missing sign,ST005; ST052,"Fixed values, created new columns, created altered column indicating change",Documented decision
+1,Swapped station coordinate values and missing sign,ST005; ST052,"Fixed values, created new columns, created altered column indicating change",Documented decision
+2,Waterbody capitalization issues,WB075,replaced all stringr to affect quinn lake string,Documented decision
