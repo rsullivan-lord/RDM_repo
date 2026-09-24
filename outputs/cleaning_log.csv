@@ -2,3 +2,4 @@ log_id,issue_or_decision,affected_records,action_taken,status
 1,Swapped station coordinate values and missing sign,ST005; ST052,"Fixed values, created new columns, created altered column indicating change",Documented decision
 2,Waterbody capitalization issues,WB075,replaced all stringr to affect quinn lake string,Documented decision
 3,"Changed comma to period, removed comma and removed unit label",CHL0154; CHL0163,"Fixed values, changed class to numeric, identified in altered column",Documented decision
+4,Chl samples date format corrections,CHL0507; CHL0524; CHL1008,"Individual fixes to YMD, identified in altered column",Documented decision

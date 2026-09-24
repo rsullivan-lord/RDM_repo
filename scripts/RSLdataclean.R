@@ -197,8 +197,47 @@ chl_a_samples_clean <- chl_a_samples_messy_raw %>%
     across(c(absorbance_663nm, sample_volume_filtered_ml), as.numeric) #changes class from character to numeric
   )
 
+#change date variable from character to date
+chl_a_samples_clean2 <- chl_a_samples_clean %>%
+  mutate(date = ymd(date))
+# Warning message:
+#   There was 1 warning in `mutate()`.
+# ℹ In argument: `date = ymd(date)`.
+# Caused by warning:
+#   !  3 failed to parse. 
 
+#What rows were turned to NA when they could not be parsed
+which(is.na(chl_a_samples_clean2$date))
+#[1]  507  524 1008
 
+#any misformatted dates?
+chl_a_samples_clean %>%
+  filter(is.na(ymd(date, quiet = TRUE)))%>%
+  select(date)
+# A tibble: 3 × 1
+# date         
+# <chr>        
+#   1 June 14, 1999
+# 2 28/06/1999   
+# 3 10/15/2002  
+
+#Fix individual lines
+chl_a_samples_clean3 <- chl_a_samples_clean %>%
+  mutate(
+    date_txt = str_squish(str_replace_all(date, "\u00a0", " ")),
+    parsed = ymd(date_txt, quiet = TRUE),
+    changed = is.na(parsed) & !is.na(date_txt), 
+    parsed = coalesce(parsed,
+                      as.Date(date_txt, format = "%B %d, %Y"),
+                      as.Date(date_txt, format = "%d/%m/%Y"),
+                      as.Date(date_txt, format = "%m/%d/%Y")),
+    altered = if_else(changed, TRUE, altered),
+    date = parsed
+    ) %>%
+  select(-date_txt, -parsed, -changed)
+#Check that it worked, this = 0
+sum(is.na(chl_a_samples_clean3$date))
+#[1] 0
 
 
 
@@ -218,6 +257,11 @@ cleaning_log <- tibble::tribble(
   "Changed comma to period, removed comma and removed unit label",
   "CHL0154; CHL0163",
   "Fixed values, changed class to numeric, identified in altered column",
+  "Documented decision",
+  
+  "Chl samples date format corrections",
+  "CHL0507; CHL0524; CHL1008",
+  "Individual fixes to YMD, identified in altered column",
   "Documented decision"
 ) |>
   mutate(log_id = row_number()) |>
