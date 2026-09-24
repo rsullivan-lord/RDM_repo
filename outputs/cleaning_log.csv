@@ -1,1 +1,2 @@
-log_id,issue_or_decision,processing_area,affected_records,action_taken,status
+log_id,issue_or_decision,affected_records,action_taken,status
+1,Swapped coordinate values and missing sign,ST005; ST052,"Fixed values, created new columns, created altered column indicating change",Documented decision
