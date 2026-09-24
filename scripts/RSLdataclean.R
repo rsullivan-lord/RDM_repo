@@ -74,7 +74,18 @@ skimr::skim(waterbodies_messy_raw)
 # 2 waterbody_name         0             1   4  23     0       87          0
 # glimpse(waterbodies_messy_raw)
 
-#Capitalize all waterbody names and create new clean dataframe with column indicating what was alteration
+#Create empty log to document cleaning changes
+#Each row documents a cleaning decision, assumption, or unresolved issue
+cleaning_log <- tibble::tibble(
+  log_id = integer(),
+  issue_or_decision = character(),
+  processing_area = character(),
+  affected_records = character(),
+  action_taken = character(),
+  status = character()
+)
+
+#Capitalize all waterbody names and create new clean dataframe with column indicating what was alterated
 waterbodies_clean <- waterbodies_messy_raw %>%
   mutate(
     waterbody_name_clean = str_replace_all(waterbody_name, "quinn lake", "Quinn Lake"),
@@ -144,7 +155,7 @@ chl_a_samples_clean <- chl_a_samples_messy_raw %>%
   mutate(
     across(c(sample_volume_filtered_ml, absorbance_663nm), as.numeric)
   )
-#returns error so identify values that are causing problem
+#returns error so identify values that are causing the problem
 chl_a_samples_messy_raw %>%
   filter(
     (!is.na(sample_volume_filtered_ml) & is.na(suppressWarnings(as.numeric(sample_volume_filtered_ml)))) |
@@ -156,7 +167,9 @@ chl_a_samples_messy_raw %>%
 #   1 CHL0154           ST095        1994-09-14                1                  NA
 # 2 CHL0163           ST069        1998-05-25                1                  NA
 
-#Fix issues with absorbance_663nm and sample_volume_filtered_ml variables
+#Visual inspection of rows identified shows likely typos involving commas where period should be, where no comma should be, unnecessary unit "mL"
+
+#Fix issues with the absorbance_663nm and sample_volume_filtered_ml variables
 chl_a_samples_clean <- chl_a_samples_messy_raw %>%
   mutate(
     altered = coalesce( #identify which rows were altered =TRUE
@@ -185,16 +198,9 @@ chl_a_samples_clean <- chl_a_samples_messy_raw %>%
   )
 
 
-#Create empty log to document cleaning changes
-#Each row documents a cleaning decision, assumption, or unresolved issue
-cleaning_log <- tibble::tibble(
-  log_id = integer(),
-  issue_or_decision = character(),
-  processing_area = character(),
-  affected_records = character(),
-  action_taken = character(),
-  status = character()
-)
+
+
+
 
 cleaning_log <- tibble::tribble(
   ~issue_or_decision, ~affected_records, ~action_taken, ~status,
@@ -217,6 +223,7 @@ cleaning_log <- tibble::tribble(
   mutate(log_id = row_number()) |>
   select(log_id, everything())
 
+#save log in outputs
 write_csv(cleaning_log, "outputs/cleaning_log.csv")
 
 
