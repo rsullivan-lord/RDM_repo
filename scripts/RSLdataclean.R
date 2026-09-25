@@ -291,10 +291,10 @@ chl_a_samples_clean2%>%
   verify(extract_volume_ml <= 1000)
 
 #confirm class
-class(chl_a_samples_clean3$extract_volume_ml)
+class(chl_a_samples_clean2$extract_volume_ml)
 
 #Make sure no NAs within 2 Chl 16 and 20 variables
-which(is.na(chl_a_samples_clean3$chl_a_16ed) | is.na(chl_a_samples_clean3$chl_a_20ed))
+which(is.na(chl_a_samples_clean2$chl_a_16ed) | is.na(chl_a_samples_clean2$chl_a_20ed))
 
 #Check for outliers, each row's mahalanobis distance is within 4 median absolute deviations of all the distances
 find_outliers <- function(col, k = 4) {
@@ -304,21 +304,18 @@ find_outliers <- function(col, k = 4) {
 }
 
 #Add outliers as own column in dataset
-chl_a_samples_clean3 <- chl_a_samples_clean3 %>%
+chl_a_samples_clean2 <- chl_a_samples_clean2 %>%
   mutate(
     outliers = find_outliers(chl_a_16ed) | find_outliers(chl_a_20ed)
   )
 
 #check it worked
-sum(chl_a_samples_clean3$outliers) #Sum = 57
+sum(chl_a_samples_clean2$outliers) #Sum = 57
 
 #Save chl_a_samples_clean3 in processed data folder
-write_csv(chl_a_samples_clean3, "data/processed/chl_a_samples_clean3.csv")
+write_csv(chl_a_samples_clean2, "data/processed/chl_a_samples_clean2.csv")
 
 #Combine waterbodies and stations by waterbody_code
-head(waterbodies_clean)
-head(stations_clean)
-
 #Join dataframes with combined altered column indicating changes
 stations_waterbodies <- stations_clean %>%
   left_join(waterbodies_clean, by = "waterbody_code", suffix = c("_station", "_waterbody"))%>%
@@ -329,7 +326,7 @@ stations_waterbodies <- stations_clean %>%
 sum(is.na(stations_waterbodies$waterbody_name_clean))
 
 #Join dataframes with combined altered column indicating changes
-combined_data <- chl_a_samples_clean3 %>%
+combined_data <- chl_a_samples_clean2 %>%
   left_join(
     stations_waterbodies %>% rename(altered_station = altered),
     by = "station_code"
@@ -337,9 +334,9 @@ combined_data <- chl_a_samples_clean3 %>%
   mutate(altered = coalesce(altered, FALSE) | coalesce(altered_station, FALSE)) %>%
   select(-altered_station)
 
-#check matching worked
+#check matching worked, should be 0
 sum(is.na(combined_data$waterbody_code))
-
+#returned 1
 combined_data %>%
   filter(is.na(waterbody_code))%>%
   select(chl_a_sample_code, station_code)
@@ -349,15 +346,16 @@ combined_data %>%
 #   1 CHL0271           ST999 #ST999 does not exist, judging by date, replicate number and subsample replicate number it should be ST097
 
 #Change from ST999 to ST097 in chl_a_samples_clean3
-chl_a_samples_clean3 <- chl_a_samples_clean3%>%
+chl_a_samples_clean2 <- chl_a_samples_clean2%>%
   mutate(
     altered = if_else(station_code == "ST999", TRUE, altered),
     station_code = if_else(station_code == "ST999", "ST097", station_code)
   )
-sum(chl_a_samples_clean3$station_code == "ST999", na.rm = TRUE)
+#Check that it worked, should return 0
+sum(chl_a_samples_clean2$station_code == "ST999", na.rm = TRUE)
 
 #Try join again station_waterbodies and chl_a_samples_clean3
-combined_data <- chl_a_samples_clean3 %>%
+combined_data <- chl_a_samples_clean2 %>%
   left_join(
     stations_waterbodies %>% rename(altered_station = altered),
     by = "station_code"
