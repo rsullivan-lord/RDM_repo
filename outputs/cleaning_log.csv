@@ -4,3 +4,6 @@ log_id,issue_or_decision,affected_records,action_taken,status
 3,"Changed comma to period, removed comma and removed unit label",CHL0154; CHL0163,"Fixed values, changed class to numeric, identified in altered column",Documented decision
 4,Chl samples date format corrections,CHL0507; CHL0524; CHL1008,"Individual fixes to YMD, identified in altered column",Documented decision
 5,Chl samples negative value in extract_volume_ml,CHL0141,"Removed all negative signs in column, identified in altered column",Documented decision
+6,Typo in sample_volume_filtered_ml,CHL0006,"Individual row fix from 10000 to 1000, identified in altered column",Documented decision
+7,Wrong class for extract_volume_ml,Whole variable extract_volume_ml,"Verified no values interfer with change, change from character to numeric",Documented decision
+8,Nonexistant Station code ST999 preventing last dataset join to chl samples,CHL0271; ST999,"Nearby values suggest typo, should be ST097, changed",Documented decision

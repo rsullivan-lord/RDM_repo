@@ -262,6 +262,144 @@ chl_a_samples_clean3 <- chl_a_samples_clean3 %>%
 #Ensure it worked, should return 0
 sum(str_detect(chl_a_samples_clean3$extract_volume_ml, "-"), na.rm = TRUE)
 
+#Check if all sample_replicate values between 1-5
+chl_a_samples_clean3%>%
+  verify(sample_replicate >= 1 & sample_replicate <= 5)
+#verification [sample_replicate >= 1 & sample_replicate <= 5] failed! (12 failures)
+
+# verb redux_fn                                     predicate column index value
+# 1  verify       NA sample_replicate >= 1 & sample_replicate <= 5     NA  1363    NA
+# 2  verify       NA sample_replicate >= 1 & sample_replicate <= 5     NA  1374    NA
+# 3  verify       NA sample_replicate >= 1 & sample_replicate <= 5     NA  1415    NA
+# 4  verify       NA sample_replicate >= 1 & sample_replicate <= 5     NA  1419    NA
+# 5  verify       NA sample_replicate >= 1 & sample_replicate <= 5     NA  1424    NA
+# 6  verify       NA sample_replicate >= 1 & sample_replicate <= 5     NA  1439    NA
+# 7  verify       NA sample_replicate >= 1 & sample_replicate <= 5     NA  1512    NA
+# 8  verify       NA sample_replicate >= 1 & sample_replicate <= 5     NA  1517    NA
+# 9  verify       NA sample_replicate >= 1 & sample_replicate <= 5     NA  1547    NA
+# 10 verify       NA sample_replicate >= 1 & sample_replicate <= 5     NA  1566    NA
+# 11 verify       NA sample_replicate >= 1 & sample_replicate <= 5     NA  1570    NA
+# 12 verify       NA sample_replicate >= 1 & sample_replicate <= 5     NA  1575    NA
+
+#These NA could be a problem, exclude from dataset, or not
+
+#All sample_volume_filtered_ml should be <= 1000
+chl_a_samples_clean3%>%
+  verify(sample_volume_filtered_ml <= 1000)
+
+#verification [sample_volume_filtered_ml <= 1000] failed! (1 failure)
+# 
+# verb redux_fn                         predicate column index value
+# 1 verify       NA sample_volume_filtered_ml <= 1000     NA     6    NA
+
+#Fix likely typo from 10000 to 1000, mark as altered
+chl_a_samples_clean3 <- chl_a_samples_clean3 %>%
+  mutate(
+    fix_volume = row_number() == 6 & sample_volume_filtered_ml == 10000,
+    sample_volume_filtered_ml = if_else(fix_volume, 1000, sample_volume_filtered_ml),
+    altered = if_else(fix_volume, TRUE, altered)
+  )%>%
+  select(-fix_volume)
+
+#Check fix worked, all values are <= 1000
+chl_a_samples_clean3 %>%
+  verify(sample_volume_filtered_ml <= 1000)
+
+#Check extract is <= 1000, max sample volume filtered
+chl_a_samples_clean3 %>%
+  mutate(extract_volume_ml = as.numeric(extract_volume_ml))
+
+class(chl_a_samples_clean3$extract_volume_ml)
+
+#Make sure no values will interfer with converting class to numeric
+chl_a_samples_clean3%>%
+  filter(is.na(as.numeric(extract_volume_ml)) & !is.na(extract_volume_ml))%>%
+  select(extract_volume_ml)
+
+#Change class to numeric
+chl_a_samples_clean3 <-chl_a_samples_clean3%>%
+  mutate(extract_volume_ml = as.numeric(extract_volume_ml))
+
+#Verify extracted values are less than sample volume
+chl_a_samples_clean3%>%
+  verify(extract_volume_ml <= 1000)
+
+#confirm class
+class(chl_a_samples_clean3$extract_volume_ml)
+
+#Make sure no NAs within 2 Chl 16 and 20 variables
+which(is.na(chl_a_samples_clean3$chl_a_16ed) | is.na(chl_a_samples_clean3$chl_a_20ed))
+
+#Check for outliers, each row's mahalanobis distance is within 4 median absolute deviations of all the distances
+find_outliers <- function(col, k = 4) {
+  med_val <- median(col, na.rm = TRUE)
+  mad_val <- mad(col, na.rm = TRUE)
+  col < (med_val - k * mad_val) | col > (med_val + k * mad_val)
+}
+
+#Add outliers as own column in dataset
+chl_a_samples_clean3 <- chl_a_samples_clean3 %>%
+  mutate(
+    outliers = find_outliers(chl_a_16ed) | find_outliers(chl_a_20ed)
+  )
+
+#check it worked
+sum(chl_a_samples_clean3$outliers) #Sum = 57
+
+#Combine waterbodies and stations by waterbody_code
+head(waterbodies_clean)
+head(stations_clean)
+
+#Join dataframes with combined altered column indicating changes
+stations_waterbodies <- stations_clean %>%
+  left_join(waterbodies_clean, by = "waterbody_code", suffix = c("_station", "_waterbody"))%>%
+  mutate(altered = altered_station | altered_waterbody) %>%
+  select(-altered_station, -altered_waterbody)
+
+#Check and make sure this is 0 so everything has a match
+sum(is.na(stations_waterbodies$waterbody_name_clean))
+
+#Join dataframes with combined altered column indicating changes
+combined_data <- chl_a_samples_clean3 %>%
+  left_join(
+    stations_waterbodies %>% rename(altered_station = altered),
+    by = "station_code"
+  ) %>%
+  mutate(altered = coalesce(altered, FALSE) | coalesce(altered_station, FALSE)) %>%
+  select(-altered_station)
+
+#check matching worked
+sum(is.na(combined_data$waterbody_code))
+
+combined_data %>%
+  filter(is.na(waterbody_code))%>%
+  select(chl_a_sample_code, station_code)
+# A tibble: 1 × 2
+# chl_a_sample_code station_code
+# <chr>             <chr>       
+#   1 CHL0271           ST999 #ST999 does not exist, judging by date, replicate number and subsample replicate number it should be ST097
+
+#Change from ST999 to ST097 in chl_a_samples_clean3
+chl_a_samples_clean3 <- chl_a_samples_clean3%>%
+  mutate(
+    altered = if_else(station_code == "ST999", TRUE, altered),
+    station_code = if_else(station_code == "ST999", "ST097", station_code)
+  )
+sum(chl_a_samples_clean3$station_code == "ST999", na.rm = TRUE)
+
+#Try join again station_waterbodies and chl_a_samples_clean3
+combined_data <- chl_a_samples_clean3 %>%
+  left_join(
+    stations_waterbodies %>% rename(altered_station = altered),
+    by = "station_code"
+  ) %>%
+  mutate(altered = coalesce(altered, FALSE) | coalesce(altered_station, FALSE)) %>%
+  select(-altered_station)
+
+#Check that it worked properly = 0
+sum(is.na(combined_data$waterbody_code))
+
+
 
 
 
@@ -293,6 +431,21 @@ cleaning_log <- tibble::tribble(
   "Chl samples negative value in extract_volume_ml",
   "CHL0141",
   "Removed all negative signs in column, identified in altered column",
+  "Documented decision",
+  
+  "Typo in sample_volume_filtered_ml",
+  "CHL0006",
+  "Individual row fix from 10000 to 1000, identified in altered column",
+  "Documented decision",
+  
+  "Wrong class for extract_volume_ml",
+  "Whole variable extract_volume_ml",
+  "Verified no values interfer with change, change from character to numeric",
+  "Documented decision",
+  
+  "Nonexistant Station code ST999 preventing last dataset join to chl samples",
+  "CHL0271; ST999",
+  "Nearby values suggest typo, should be ST097, changed",
   "Documented decision"
 ) |>
   mutate(log_id = row_number()) |>
