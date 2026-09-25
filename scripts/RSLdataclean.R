@@ -275,7 +275,7 @@ chl_a_samples_clean2 %>%
   mutate(extract_volume_ml = as.numeric(extract_volume_ml))
 
 #Check class of extract_volume_ml, should be numeric
-class(chl_a_samples_clean2$extract_volume_ml) #it shows its character
+class(chl_a_samples_clean2$extract_volume_ml) #shows its character
 
 #Make sure no values will interfer with converting class to numeric
 chl_a_samples_clean2%>%
@@ -297,22 +297,47 @@ class(chl_a_samples_clean2$extract_volume_ml)
 which(is.na(chl_a_samples_clean2$chl_a_16ed) | is.na(chl_a_samples_clean2$chl_a_20ed))
 
 #Check for outliers, each row's mahalanobis distance is within 4 median absolute deviations of all the distances
-find_outliers <- function(col, k = 4) {
-  med_val <- median(col, na.rm = TRUE)
-  mad_val <- mad(col, na.rm = TRUE)
-  col < (med_val - k * mad_val) | col > (med_val + k * mad_val)
+find_outliers <- function(x, k = 4) {
+  midpoint <- median(x, na.rm = TRUE)
+  spread <- mad(x, na.rm = TRUE)
+  x < (midpoint - k * spread) | x > (midpoint + k * spread)
 }
 
-#Add outliers as own column in dataset
-chl_a_samples_clean2 <- chl_a_samples_clean2 %>%
-  mutate(
-    outliers = find_outliers(chl_a_16ed) | find_outliers(chl_a_20ed)
+#Identify which obs are potential outliers by MAD 4 criteria
+mad_flagged <- find_outliers(chl_a_samples_clean2$chl_a_16ed) |
+  find_outliers(chl_a_samples_clean2$chl_a_20ed)
+
+sum(mad_flagged, na.rm = TRUE) #Sum = 57 potential outliers
+
+#Plot for visual of Chl 16ed and 20ed on 1:1 line
+ggplot(chl_a_samples_clean2, aes(x = chl_a_16ed, y = chl_a_20ed))+
+  geom_point(alpha = 0.5) +
+  geom_abline(slope = 1, intercept = 0, color = "orange", linetype = "dashed" )+
+  coord_equal() +
+  labs(
+    x = "Chlorophyll 16ed",
+    y = "cholorphyll 20ed",
+    title = "1:1 Comp Chl16 v Chl20"
   )
 
-#check it worked
-sum(chl_a_samples_clean2$outliers) #Sum = 57
+#Shows likely only true outlier is value close to 400
+chl_a_samples_clean2 <- chl_a_samples_clean2%>%
+  mutate(outliers = chl_a_16ed > 300 | chl_a_20ed >300)
 
-#Save chl_a_samples_clean3 in processed data folder
+#Check that it worked, should equal 1
+sum(chl_a_samples_clean2$outliers)
+
+#Identify unique CHL code of outlier
+chl_a_samples_clean2 %>%
+  filter(outliers) %>%
+  select(chl_a_sample_code, station_code, date, chl_a_16ed, chl_a_20ed)
+# A tibble: 1 × 5
+# chl_a_sample_code station_code date       chl_a_16ed chl_a_20ed
+# <chr>             <chr>        <date>          <dbl>      <dbl>
+#   1 CHL0002           ST068        1983-05-31       1.37       391.
+
+
+#Save chl_a_samples_clean2 in processed data folder
 write_csv(chl_a_samples_clean2, "data/processed/chl_a_samples_clean2.csv")
 
 #Combine waterbodies and stations by waterbody_code
@@ -354,7 +379,7 @@ chl_a_samples_clean2 <- chl_a_samples_clean2%>%
 #Check that it worked, should return 0
 sum(chl_a_samples_clean2$station_code == "ST999", na.rm = TRUE)
 
-#Try join again station_waterbodies and chl_a_samples_clean3
+#Try join again station_waterbodies and chl_a_samples_clean2
 combined_data <- chl_a_samples_clean2 %>%
   left_join(
     stations_waterbodies %>% rename(altered_station = altered),
