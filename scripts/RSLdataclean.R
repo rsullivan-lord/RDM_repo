@@ -53,7 +53,6 @@ dim(waterbodies_messy_raw) #[1] 87 rows (observations) 2 columns (variables)
 head(waterbodies_messy_raw, 5)
 summary(waterbodies_messy_raw)
 skimr::skim(waterbodies_messy_raw)
-
 glimpse(waterbodies_messy_raw)
 
 #Create empty log to document cleaning changes
@@ -188,7 +187,7 @@ date_check <- chl_a_samples_clean %>%
 #   !  3 failed to parse. 
 
 #What rows were turned to NA when they could not be parsed
-which(is.na(chl_a_samples_clean2$date))
+which(is.na(date_check$date))
 #[1]  507  524 1008
 
 #Check if there are any dates not in YMD format
@@ -203,7 +202,7 @@ chl_a_samples_clean %>%
 # 3 10/15/2002  
 
 #Fix these 3 individual lines to YMD format
-chl_a_samples_clean3 <- chl_a_samples_clean %>%
+chl_a_samples_clean2 <- chl_a_samples_clean %>%
   mutate(
     date_txt = str_squish(str_replace_all(date, "\u00a0", " ")), #in case there are any hidden text problems
     parsed = ymd(date_txt, quiet = TRUE),
@@ -218,12 +217,12 @@ chl_a_samples_clean3 <- chl_a_samples_clean %>%
   select(-date_txt, -parsed, -changed)
 
 #Check that it worked, there are 0 NA values in $date
-sum(is.na(chl_a_samples_clean3$date))
+sum(is.na(chl_a_samples_clean2$date))
 #[1] 0
 
 #Ensure all measurements are positive
-chl_a_samples_clean3%>%
-  verify(within_bounds(0, Inf),
+chl_a_samples_clean2%>%
+  assert(within_bounds(0, Inf),
          -c(chl_a_sample_code, station_code, date, sample_replicate, subsample_replicate, description, unit, altered))
 #Column 'extract_volume_ml' violates assertion 'within_bounds(0, Inf)' 1 time
 # verb redux_fn             predicate            column index value
@@ -232,7 +231,7 @@ chl_a_samples_clean3%>%
 # Error: assertr stopped execution
 
 #Remove negative sign from any values in column, even though only one identified
-chl_a_samples_clean3 <- chl_a_samples_clean3 %>%
+chl_a_samples_clean2 <- chl_a_samples_clean2 %>%
   mutate(
     had_dash = str_detect(extract_volume_ml, "-"), #identify any negative values
     extract_volume_ml = str_remove_all(extract_volume_ml, "-"), #remove all negatives
@@ -241,16 +240,16 @@ chl_a_samples_clean3 <- chl_a_samples_clean3 %>%
   select(-had_dash) #remove column once values marked as altered
 
 #Ensure it worked, should return 0
-sum(str_detect(chl_a_samples_clean3$extract_volume_ml, "-"), na.rm = TRUE)
+sum(str_detect(chl_a_samples_clean2$extract_volume_ml, "-"), na.rm = TRUE)
 
 #Check if all sample_replicate values between 1-5
-chl_a_samples_clean3%>%
+chl_a_samples_clean2%>%
   verify(sample_replicate >= 1 & sample_replicate <= 5)
 #verification [sample_replicate >= 1 & sample_replicate <= 5] failed! (12 failures)
 #These NA could be a problem, exclude from dataset, or not
 
 #All sample_volume_filtered_ml should be <= 1000
-chl_a_samples_clean3%>%
+chl_a_samples_clean2%>%
   verify(sample_volume_filtered_ml <= 1000)
 
 #verification [sample_volume_filtered_ml <= 1000] failed! (1 failure)
@@ -259,7 +258,7 @@ chl_a_samples_clean3%>%
 # 1 verify       NA sample_volume_filtered_ml <= 1000     NA     6    NA
 
 #Fix likely typo from 10000 to 1000, mark as altered
-chl_a_samples_clean3 <- chl_a_samples_clean3 %>%
+chl_a_samples_clean2 <- chl_a_samples_clean2 %>%
   mutate(
     fix_volume = chl_a_sample_code == "CHL0006" & sample_volume_filtered_ml == 10000, #selects problem by sample code
     sample_volume_filtered_ml = if_else(fix_volume, 1000, sample_volume_filtered_ml),
@@ -268,26 +267,27 @@ chl_a_samples_clean3 <- chl_a_samples_clean3 %>%
   select(-fix_volume)
 
 #Check fix worked, all values are <= 1000
-chl_a_samples_clean3 %>%
+chl_a_samples_clean2 %>%
   verify(sample_volume_filtered_ml <= 1000)
 
 #Check extract is <= 1000, max sample volume filtered
-chl_a_samples_clean3 %>%
+chl_a_samples_clean2 %>%
   mutate(extract_volume_ml = as.numeric(extract_volume_ml))
 
-class(chl_a_samples_clean3$extract_volume_ml)
+#Check class of extract_volume_ml, should be numeric
+class(chl_a_samples_clean2$extract_volume_ml) #it shows its character
 
 #Make sure no values will interfer with converting class to numeric
-chl_a_samples_clean3%>%
+chl_a_samples_clean2%>%
   filter(is.na(as.numeric(extract_volume_ml)) & !is.na(extract_volume_ml))%>%
   select(extract_volume_ml)
 
 #Change class to numeric
-chl_a_samples_clean3 <-chl_a_samples_clean3%>%
+chl_a_samples_clean2 <-chl_a_samples_clean2%>%
   mutate(extract_volume_ml = as.numeric(extract_volume_ml))
 
 #Verify extracted values are less than sample volume
-chl_a_samples_clean3%>%
+chl_a_samples_clean2%>%
   verify(extract_volume_ml <= 1000)
 
 #confirm class
