@@ -3,3 +3,4 @@ log_id,issue_or_decision,affected_records,action_taken,status
 2,Waterbody capitalization issues,WB075,replaced all stringr to affect quinn lake string,Documented decision
 3,"Changed comma to period, removed comma and removed unit label",CHL0154; CHL0163,"Fixed values, changed class to numeric, identified in altered column",Documented decision
 4,Chl samples date format corrections,CHL0507; CHL0524; CHL1008,"Individual fixes to YMD, identified in altered column",Documented decision
+5,Chl samples negative value in extract_volume_ml,CHL0141,"Removed all negative signs in column, identified in altered column",Documented decision

@@ -210,7 +210,7 @@ chl_a_samples_clean2 <- chl_a_samples_clean %>%
 which(is.na(chl_a_samples_clean2$date))
 #[1]  507  524 1008
 
-#any misformatted dates?
+#Check if there are any dates not in YMD format
 chl_a_samples_clean %>%
   filter(is.na(ymd(date, quiet = TRUE)))%>%
   select(date)
@@ -221,26 +221,52 @@ chl_a_samples_clean %>%
 # 2 28/06/1999   
 # 3 10/15/2002  
 
-#Fix individual lines
+#Fix these 3 individual lines to YMD format
 chl_a_samples_clean3 <- chl_a_samples_clean %>%
   mutate(
-    date_txt = str_squish(str_replace_all(date, "\u00a0", " ")),
+    date_txt = str_squish(str_replace_all(date, "\u00a0", " ")), #in case there are any hidden text problems
     parsed = ymd(date_txt, quiet = TRUE),
     changed = is.na(parsed) & !is.na(date_txt), 
     parsed = coalesce(parsed,
                       as.Date(date_txt, format = "%B %d, %Y"),
                       as.Date(date_txt, format = "%d/%m/%Y"),
                       as.Date(date_txt, format = "%m/%d/%Y")),
-    altered = if_else(changed, TRUE, altered),
+    altered = if_else(changed, TRUE, altered), #marks as altered, keeps previous other altered values
     date = parsed
     ) %>%
   select(-date_txt, -parsed, -changed)
-#Check that it worked, this = 0
+
+#Check that it worked, there are 0 NA values in $date
 sum(is.na(chl_a_samples_clean3$date))
 #[1] 0
 
+#Ensure all measurements are positive
+chl_a_samples_clean3%>%
+  assert(within_bounds(0, Inf),
+         -c(chl_a_sample_code, station_code, date, sample_replicate, subsample_replicate, description, unit, altered))
+#Column 'extract_volume_ml' violates assertion 'within_bounds(0, Inf)' 1 time
+# verb redux_fn             predicate            column index value
+# 1 assert       NA within_bounds(0, Inf) extract_volume_ml   141  -9.8
+# 
+# Error: assertr stopped execution
+
+#Remove negative sign from any values in column, even though only one identified
+chl_a_samples_clean3 <- chl_a_samples_clean3 %>%
+  mutate(
+    had_dash = str_detect(extract_volume_ml, "-"), #identify any negative values
+    extract_volume_ml = str_remove_all(extract_volume_ml, "-"), #remove all negatives
+    altered = if_else(coalesce(had_dash, FALSE), TRUE, altered) #mark altered if had negative sign
+  ) %>%
+  select(-had_dash) #remove column once values marked as altered
+
+#Ensure it worked, should return 0
+sum(str_detect(chl_a_samples_clean3$extract_volume_ml, "-"), na.rm = TRUE)
 
 
+
+
+
+#Record of changes made to datasets
 cleaning_log <- tibble::tribble(
   ~issue_or_decision, ~affected_records, ~action_taken, ~status,
   
@@ -262,6 +288,11 @@ cleaning_log <- tibble::tribble(
   "Chl samples date format corrections",
   "CHL0507; CHL0524; CHL1008",
   "Individual fixes to YMD, identified in altered column",
+  "Documented decision",
+  
+  "Chl samples negative value in extract_volume_ml",
+  "CHL0141",
+  "Removed all negative signs in column, identified in altered column",
   "Documented decision"
 ) |>
   mutate(log_id = row_number()) |>
