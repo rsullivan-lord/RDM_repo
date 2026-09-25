@@ -20,9 +20,6 @@ theme_set(theme_bw())
 
 #confirm project root path
 here::i_am("scripts/RSLdataclean.R")
-here("data", "chl-a-samples-messy.csv")
-here("data", "stations-messy.csv")
-here("data", "waterbodies-messy.csv")
 
 #Read in raw chlorophyll A data
 chl_a_samples_messy_raw <- readr::read_csv(
@@ -57,29 +54,13 @@ head(waterbodies_messy_raw, 5)
 summary(waterbodies_messy_raw)
 skimr::skim(waterbodies_messy_raw)
 
-#── Data Summary ────────────────────────
-# Values               
-# Name                       waterbodies_messy_raw
-# Number of rows             87                   
-# Number of columns          2                    
-# _______________________                         
-# Column type frequency:                          
-#   character                2                    
-# ________________________                        
-# Group variables            None                 
-# 
-# ── Variable type: character ─────────────────────────────────────────────────────────────
-# skim_variable  n_missing complete_rate min max empty n_unique whitespace
-# 1 waterbody_code         0             1   5   5     0       87          0
-# 2 waterbody_name         0             1   4  23     0       87          0
-# glimpse(waterbodies_messy_raw)
+glimpse(waterbodies_messy_raw)
 
 #Create empty log to document cleaning changes
 #Each row documents a cleaning decision, assumption, or unresolved issue
 cleaning_log <- tibble::tibble(
   log_id = integer(),
   issue_or_decision = character(),
-  processing_area = character(),
   affected_records = character(),
   action_taken = character(),
   status = character()
@@ -180,13 +161,13 @@ chl_a_samples_clean <- chl_a_samples_messy_raw %>%
     ), 
 
     absorbance_663nm = if_else(
-      row_number() == 154, #specifically selects one problem
+      chl_a_sample_code == "CHL0154", #specifically selects the problem row ID
       str_replace(absorbance_663nm, ",", "."), #replaces comma with period
       absorbance_663nm
     ),
     
     sample_volume_filtered_ml = if_else(
-      row_number() == 163, #specifically selects one problem
+      chl_a_sample_code == "CHL0163", #specifically selects one problem
       sample_volume_filtered_ml %>%
         str_remove_all(",") %>% #change 1,000 to 1000
         str_remove_all(regex("mL", ignore_case=TRUE)) %>% #removes unnecessary unit label
@@ -198,7 +179,7 @@ chl_a_samples_clean <- chl_a_samples_messy_raw %>%
   )
 
 #change date variable from character to date
-chl_a_samples_clean2 <- chl_a_samples_clean %>%
+date_check <- chl_a_samples_clean %>%
   mutate(date = ymd(date))
 # Warning message:
 #   There was 1 warning in `mutate()`.
@@ -242,7 +223,7 @@ sum(is.na(chl_a_samples_clean3$date))
 
 #Ensure all measurements are positive
 chl_a_samples_clean3%>%
-  assert(within_bounds(0, Inf),
+  verify(within_bounds(0, Inf),
          -c(chl_a_sample_code, station_code, date, sample_replicate, subsample_replicate, description, unit, altered))
 #Column 'extract_volume_ml' violates assertion 'within_bounds(0, Inf)' 1 time
 # verb redux_fn             predicate            column index value
@@ -266,21 +247,6 @@ sum(str_detect(chl_a_samples_clean3$extract_volume_ml, "-"), na.rm = TRUE)
 chl_a_samples_clean3%>%
   verify(sample_replicate >= 1 & sample_replicate <= 5)
 #verification [sample_replicate >= 1 & sample_replicate <= 5] failed! (12 failures)
-
-# verb redux_fn                                     predicate column index value
-# 1  verify       NA sample_replicate >= 1 & sample_replicate <= 5     NA  1363    NA
-# 2  verify       NA sample_replicate >= 1 & sample_replicate <= 5     NA  1374    NA
-# 3  verify       NA sample_replicate >= 1 & sample_replicate <= 5     NA  1415    NA
-# 4  verify       NA sample_replicate >= 1 & sample_replicate <= 5     NA  1419    NA
-# 5  verify       NA sample_replicate >= 1 & sample_replicate <= 5     NA  1424    NA
-# 6  verify       NA sample_replicate >= 1 & sample_replicate <= 5     NA  1439    NA
-# 7  verify       NA sample_replicate >= 1 & sample_replicate <= 5     NA  1512    NA
-# 8  verify       NA sample_replicate >= 1 & sample_replicate <= 5     NA  1517    NA
-# 9  verify       NA sample_replicate >= 1 & sample_replicate <= 5     NA  1547    NA
-# 10 verify       NA sample_replicate >= 1 & sample_replicate <= 5     NA  1566    NA
-# 11 verify       NA sample_replicate >= 1 & sample_replicate <= 5     NA  1570    NA
-# 12 verify       NA sample_replicate >= 1 & sample_replicate <= 5     NA  1575    NA
-
 #These NA could be a problem, exclude from dataset, or not
 
 #All sample_volume_filtered_ml should be <= 1000
@@ -295,7 +261,7 @@ chl_a_samples_clean3%>%
 #Fix likely typo from 10000 to 1000, mark as altered
 chl_a_samples_clean3 <- chl_a_samples_clean3 %>%
   mutate(
-    fix_volume = row_number() == 6 & sample_volume_filtered_ml == 10000,
+    fix_volume = chl_a_sample_code == "CHL0006" & sample_volume_filtered_ml == 10000, #selects problem by sample code
     sample_volume_filtered_ml = if_else(fix_volume, 1000, sample_volume_filtered_ml),
     altered = if_else(fix_volume, TRUE, altered)
   )%>%
@@ -451,8 +417,8 @@ cleaning_log <- tibble::tribble(
   "CHL0271; ST999",
   "Nearby values suggest typo, should be ST097, changed",
   "Documented decision"
-) |>
-  mutate(log_id = row_number()) |>
+) %>%
+  mutate(log_id = row_number()) %>%
   select(log_id, everything())
 
 #save log in outputs
