@@ -346,6 +346,9 @@ chl_a_samples_clean3 <- chl_a_samples_clean3 %>%
 #check it worked
 sum(chl_a_samples_clean3$outliers) #Sum = 57
 
+#Save chl_a_samples_clean3 in processed data folder
+write_csv(chl_a_samples_clean3, "data/processed/chl_a_samples_clean3.csv")
+
 #Combine waterbodies and stations by waterbody_code
 head(waterbodies_clean)
 head(stations_clean)
@@ -399,7 +402,8 @@ combined_data <- chl_a_samples_clean3 %>%
 #Check that it worked properly = 0
 sum(is.na(combined_data$waterbody_code))
 
-
+#Save stations_clean in processed data folder
+write_csv(combined_data, "data/processed/combined_data_clean.csv")
 
 
 
