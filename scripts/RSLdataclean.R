@@ -2,8 +2,6 @@
 #September 29 2026
 
 #install any of the following packages you don't yet have
-#use: install.packages("name of package")
-#then load each with library
 
 # Setup ------------------------------------------------------------------------
 library(assertr)
