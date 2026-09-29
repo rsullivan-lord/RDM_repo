@@ -1,10 +1,11 @@
 #Rachel Sullivan-Lord RDM Course Data Cleaning Project
-#September 23 2026
+#September 29 2026
 
 #install any of the following packages you don't yet have
 #use: install.packages("name of package")
 #then load each with library
 
+# Setup ------------------------------------------------------------------------
 library(assertr)
 library(stringdist) 
 library(tidyverse)
@@ -18,6 +19,7 @@ library(dplyr)
 ## set a plotting theme
 theme_set(theme_bw())
 
+#Load Raw Data------------------------------------------------------------------
 #confirm project root path
 here::i_am("scripts/RSLdataclean.R")
 
@@ -48,7 +50,7 @@ waterbodies_messy_raw <- readr::read_csv(
   )
 )
 
-#Data exploration waterbodies-messy.csv
+#Data exploration and clean waterbodies-messy-----------------------------------
 dim(waterbodies_messy_raw) #[1] 87 rows (observations) 2 columns (variables)
 head(waterbodies_messy_raw, 5)
 summary(waterbodies_messy_raw)
@@ -77,7 +79,7 @@ waterbodies_clean <- waterbodies_messy_raw %>%
 #Save cleaned waterbodies csv file
 write_csv(waterbodies_clean, "data/processed/waterbodies_clean.csv")
 
-#Data exploration Stations messy
+#Data exploration and clean Stations messy--------------------------------------
 dim(stations_messy_raw) #[1] 97 rows (observations) 6 columns (variables)
 head(stations_messy_raw, 5)
 summary(stations_messy_raw)
@@ -123,7 +125,7 @@ stations_clean %>%
 #Save stations_clean in processed data folder
 write_csv(stations_clean, "data/processed/stations_clean.csv")
 
-#Data exploration Chlorophyll samples messy
+#Data exploration and clean Chlorophyll samples messy---------------------------
 dim(chl_a_samples_messy_raw) #[1] 1578 rows (observations) and 15 columns (variables)
 head(chl_a_samples_messy_raw, 5)
 summary(chl_a_samples_messy_raw)
@@ -177,7 +179,7 @@ chl_a_samples_clean <- chl_a_samples_messy_raw %>%
     across(c(absorbance_663nm, sample_volume_filtered_ml), as.numeric) #changes class from character to numeric
   )
 
-#change date variable from character to date
+#Fix data formats change date variable from character to date
 date_check <- chl_a_samples_clean %>%
   mutate(date = ymd(date))
 # Warning message:
@@ -220,7 +222,7 @@ chl_a_samples_clean2 <- chl_a_samples_clean %>%
 sum(is.na(chl_a_samples_clean2$date))
 #[1] 0
 
-#Ensure all measurements are positive
+#Ensure all measurements are positive, Fix extract_volumne_ml
 chl_a_samples_clean2%>%
   assert(within_bounds(0, Inf),
          -c(chl_a_sample_code, station_code, date, sample_replicate, subsample_replicate, description, unit, altered))
@@ -296,7 +298,7 @@ class(chl_a_samples_clean2$extract_volume_ml)
 #Make sure no NAs within 2 Chl 16 and 20 variables
 which(is.na(chl_a_samples_clean2$chl_a_16ed) | is.na(chl_a_samples_clean2$chl_a_20ed))
 
-#Check for outliers, each row's mahalanobis distance is within 4 median absolute deviations of all the distances
+#Identify outliers, each row's mahalanobis distance is within 4 median absolute deviations of all the distances
 find_outliers <- function(x, k = 4) {
   midpoint <- median(x, na.rm = TRUE)
   spread <- mad(x, na.rm = TRUE)
@@ -340,7 +342,7 @@ chl_a_samples_clean2 %>%
 #Save chl_a_samples_clean2 in processed data folder
 write_csv(chl_a_samples_clean2, "data/processed/chl_a_samples_clean2.csv")
 
-#Combine waterbodies and stations by waterbody_code
+#Combine waterbodies and stations by waterbody_code-----------------------------
 #Join dataframes with combined altered column indicating changes
 stations_waterbodies <- stations_clean %>%
   left_join(waterbodies_clean, by = "waterbody_code", suffix = c("_station", "_waterbody"))%>%
@@ -394,10 +396,7 @@ sum(is.na(combined_data$waterbody_code))
 #Save stations_clean in processed data folder
 write_csv(combined_data, "data/processed/combined_data_clean.csv")
 
-
-
-
-#Record of changes made to datasets
+#Record of changes made to datasets---------------------------------------------
 cleaning_log <- tibble::tribble(
   ~issue_or_decision, ~affected_records, ~action_taken, ~status,
   
